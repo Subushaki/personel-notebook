@@ -17,13 +17,14 @@ const CATEGORIES = [
   },
   {
     id: "grammar",
-    name: "Gramer Formülleri",
-    subtitle: "Formula & Tense Quiz",
+    name: "Gramer & Formüller",
+    subtitle: "Formula & Grammar Hub",
     icon: "⚡",
-    description: "Kısa/uzun formülü gör, doğru gramer konusunu yaz!",
+    description: "Formülü gör konuyu yaz veya cümle boşluk doldurma testi yap!",
     color: "#8b5cf6",
     modes: [
-      { id: "formula-topic", label: "Formül → Konu Adı", icon: "📐 → ✍️" }
+      { id: "formula-topic", label: "Formül Quizi", icon: "📐 → ✍️" },
+      { id: "gap-fill", label: "Gramer Testi (Boşluk Doldurma)", icon: "📝 → 🔤" }
     ],
     supportsStudy: true,
     isGrammar: true

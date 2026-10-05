@@ -38,7 +38,8 @@
 
   function getQuizStateKey() {
     const p = new URLSearchParams(window.location.search);
-    let key = 'quiz_state_' + (p.get('dataset') || 'kurs') + '_' + (p.get('mode') || 'en-tr');
+    const cat = p.get('category') || p.get('dataset') || 'kurs';
+    let key = 'quiz_state_' + cat + '_' + (p.get('mode') || 'en-tr');
     if (p.get('timesFilter')) key += '_' + p.get('timesFilter');
     if (p.get('custom') === 'true') key += '_custom';
     if (p.get('exclude') === 'true') key += '_excl';
@@ -46,6 +47,18 @@
   }
 
   function findWordById(id) {
+    if (typeof DataManager !== 'undefined') {
+      const f = DataManager.getItemById(id);
+      if (f) return f;
+    }
+    if (typeof GRAMMAR_TEST_DATA !== 'undefined') {
+      const f = GRAMMAR_TEST_DATA.find(w => w.id === id);
+      if (f) return f;
+    }
+    if (typeof WORDS_A2_GRAMMAR !== 'undefined') {
+      const f = WORDS_A2_GRAMMAR.find(w => w.id === id);
+      if (f) return f;
+    }
     if (typeof ALL_WORDS_A2 !== 'undefined') {
       const f = ALL_WORDS_A2.find(w => w.id === id);
       if (f) return f;
@@ -145,6 +158,7 @@
       let selectedData = typeof WORDS_A2 !== 'undefined' ? WORDS_A2 : [];
       if (category === 'genel' && typeof WORDS_A2_GENEL !== 'undefined') selectedData = WORDS_A2_GENEL;
       else if (category === 'grammar' && typeof WORDS_A2_GRAMMAR !== 'undefined') selectedData = WORDS_A2_GRAMMAR;
+      else if (category === 'grammar_test' && typeof GRAMMAR_TEST_DATA !== 'undefined') selectedData = GRAMMAR_TEST_DATA;
       else if (category === 'deyimler' && typeof WORDS_A2_DEYIMLER !== 'undefined') selectedData = WORDS_A2_DEYIMLER;
       else if (category === 'times' && typeof WORDS_A2_TIMES !== 'undefined') selectedData = WORDS_A2_TIMES;
       wordList = [...selectedData];
@@ -174,14 +188,23 @@
     }
 
     if (!wordList || wordList.length === 0) {
-      // Default to vocab if empty
-      wordList = typeof DataManager !== 'undefined' ? DataManager.getItemsByCategory('vocab') : [];
+      if (category === 'grammar_test' && typeof GRAMMAR_TEST_DATA !== 'undefined') {
+        wordList = [...GRAMMAR_TEST_DATA];
+      } else {
+        wordList = typeof DataManager !== 'undefined' ? DataManager.getItemsByCategory('vocab') : [];
+      }
     }
 
     totalWords = wordList.length;
 
     // Set UI labels
-    if (category === 'grammar') {
+    if (category === 'grammar_test' || mode === 'gap-fill') {
+      mode = 'gap-fill';
+      if (!isCustomQuiz) document.getElementById('progress-mode-label').textContent = '📝 Gramer Testi (Boşluk Doldurma)';
+      document.getElementById('question-label').textContent = 'COMPLETE THE SENTENCE';
+      document.getElementById('answer-label').textContent = 'FILL IN THE BLANKS (ENGLISH)';
+      document.getElementById('answer-input').placeholder = 'Write the missing word(s)...';
+    } else if (category === 'grammar') {
       mode = 'formula-topic';
       if (!isCustomQuiz) document.getElementById('progress-mode-label').textContent = '⚡ Gramer Formülleri & Tense Quizi';
       document.getElementById('question-label').textContent = 'FORMÜL & İPUCU (Konuyu Bul)';
@@ -568,11 +591,109 @@
 
     currentItem = queue.shift();
     const w = currentItem.word;
-    const isGrammar = w.category === 'grammar' || !!w.formula_short || mode === 'formula-topic';
+    const isGrammarTest = w.category === 'grammar_test' || mode === 'gap-fill';
+    const isGrammar = !isGrammarTest && (w.category === 'grammar' || !!w.formula_short || mode === 'formula-topic');
 
     const qEl = document.getElementById('question-word');
 
-    if (isGrammar) {
+    // Remove any leftover multi-gap inputs
+    const existingMulti = document.getElementById('multi-gap-inputs');
+    if (existingMulti) existingMulti.remove();
+
+    const input = document.getElementById('answer-input');
+
+    if (isGrammarTest) {
+      const blankCount = (w.blanks && w.blanks.length) || 1;
+      let sentenceHtml = escapeHtml(w.sentence || w.en || '');
+      let bCount = 0;
+      sentenceHtml = sentenceHtml.replace(/_______/g, () => {
+        bCount++;
+        return `<span class="blank-marker">[${bCount}] _______</span>`;
+      });
+
+      qEl.innerHTML = `
+        <div class="grammar-test-card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span class="grammar-test-topic">${escapeHtml(w.topic || 'Gramer Testi')}</span>
+            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">${blankCount} BOŞLUK</span>
+          </div>
+          <div class="grammar-test-sentence">${sentenceHtml}</div>
+        </div>
+      `;
+
+      if (w.blanks && w.blanks.length > 1) {
+        // Multi-blank mode: hide single input, render multi-inputs
+        input.style.display = 'none';
+        const inputGroup = document.querySelector('.answer-input-group');
+        const submitBtn = document.getElementById('submit-btn');
+
+        const multiContainer = document.createElement('div');
+        multiContainer.id = 'multi-gap-inputs';
+        multiContainer.className = 'grammar-test-inputs';
+
+        w.blanks.forEach((b, idx) => {
+          const row = document.createElement('div');
+          row.className = 'blank-input-row';
+          row.innerHTML = `
+            <span class="blank-num-badge">${b.index || (idx + 1)}</span>
+            <input
+              type="text"
+              class="answer-input gap-input"
+              id="gap-input-${idx}"
+              data-blank-index="${idx}"
+              placeholder="(${escapeHtml(b.clue || '')}) için fiil/kelime hali..."
+              autocomplete="off"
+              autocapitalize="none"
+              spellcheck="false"
+            >
+          `;
+          multiContainer.appendChild(row);
+        });
+
+        if (inputGroup && submitBtn) {
+          inputGroup.insertBefore(multiContainer, submitBtn);
+        }
+
+        // Key listeners for multi-gap inputs
+        w.blanks.forEach((b, idx) => {
+          const gapInp = document.getElementById('gap-input-' + idx);
+          if (gapInp) {
+            gapInp.addEventListener('keydown', function (e) {
+              if (document.querySelector('.o2-modal-overlay.open')) return;
+              if (e.key === 'Enter' && !isWaiting) {
+                e.stopPropagation();
+                if (idx < w.blanks.length - 1) {
+                  const nextInp = document.getElementById('gap-input-' + (idx + 1));
+                  if (nextInp) nextInp.focus();
+                } else {
+                  checkAnswer();
+                }
+              }
+            });
+          }
+        });
+
+        const firstInp = document.getElementById('gap-input-0');
+        if (firstInp) firstInp.focus();
+
+      } else {
+        // Single blank grammar test
+        input.style.display = '';
+        input.value = '';
+        input.className = 'answer-input';
+        input.disabled = false;
+        const clue = (w.blanks && w.blanks[0] && w.blanks[0].clue) ? w.blanks[0].clue : '';
+        input.placeholder = clue ? `(${clue}) için doğru hali yazın...` : 'Cevabınızı yazın...';
+        input.focus();
+      }
+
+    } else if (isGrammar) {
+      input.style.display = '';
+      input.value = '';
+      input.className = 'answer-input';
+      input.disabled = false;
+      input.placeholder = 'Konuyu veya Tense adını yazın (örn: Present Perfect)...';
+
       const exampleStr = w.forms && w.forms.positive ? w.forms.positive.example : (w.hintEn || '');
       const signalsStr = w.signal_words ? w.signal_words.slice(0, 5).join(', ') : '';
 
@@ -591,16 +712,16 @@
           ` : ''}
         </div>
       `;
+      input.focus();
     } else {
+      input.style.display = '';
+      input.value = '';
+      input.className = 'answer-input';
+      input.disabled = false;
       const questionWord = mode === 'en-tr' ? w.en : w.tr;
       qEl.textContent = questionWord;
+      input.focus();
     }
-
-    const input = document.getElementById('answer-input');
-    input.value = '';
-    input.className = 'answer-input';
-    input.disabled = false;
-    input.focus();
 
     document.getElementById('feedback-message').className = 'feedback-message';
     document.getElementById('feedback-message').innerHTML = '';
@@ -629,23 +750,77 @@
   window.checkAnswer = function () {
     if (isWaiting || !currentItem) return;
 
-    const input = document.getElementById('answer-input');
-    const userAnswer = input.value.trim();
+    const w = currentItem.word;
+    const isGrammarTest = w.category === 'grammar_test' || mode === 'gap-fill';
+    const isGrammar = !isGrammarTest && (w.category === 'grammar' || !!w.formula_short || mode === 'formula-topic');
 
-    if (userAnswer === '') {
-      input.focus();
-      return;
-    }
-
-    const isGrammar = currentItem.word.category === 'grammar' || !!currentItem.word.formula_short || mode === 'formula-topic';
     let isCorrect = false;
     let correctAnswerDisplay = '';
+    let blankResults = [];
 
-    if (isGrammar) {
-      isCorrect = compareGrammarAnswer(userAnswer, currentItem.word);
-      correctAnswerDisplay = (currentItem.word.topic_en || currentItem.word.tr) + (currentItem.word.topic_tr ? ` (${currentItem.word.topic_tr})` : '');
+    if (isGrammarTest) {
+      const blanks = w.blanks || [{ index: 1, clue: '', answers: [w.en] }];
+      const userAnswers = [];
+
+      if (blanks.length > 1) {
+        let allFilled = true;
+        for (let i = 0; i < blanks.length; i++) {
+          const inp = document.getElementById('gap-input-' + i);
+          const val = inp ? inp.value.trim() : '';
+          if (!val) {
+            allFilled = false;
+            if (inp) inp.focus();
+            break;
+          }
+          userAnswers.push(val);
+        }
+        if (!allFilled) return;
+      } else {
+        const inp = document.getElementById('answer-input');
+        const val = inp.value.trim();
+        if (!val) {
+          inp.focus();
+          return;
+        }
+        userAnswers.push(val);
+      }
+
+      let allGapsCorrect = true;
+      for (let i = 0; i < blanks.length; i++) {
+        const b = blanks[i];
+        const uAns = userAnswers[i];
+        const ok = isGapAnswerCorrect(uAns, b.answers);
+        blankResults.push({ index: i, userAns: uAns, isCorrect: ok, answers: b.answers });
+        if (!ok) allGapsCorrect = false;
+
+        const inpEl = blanks.length > 1
+          ? document.getElementById('gap-input-' + i)
+          : document.getElementById('answer-input');
+        if (inpEl) {
+          inpEl.className = 'answer-input ' + (ok ? 'correct' : 'wrong');
+          inpEl.disabled = true;
+        }
+      }
+
+      isCorrect = allGapsCorrect;
+
+    } else if (isGrammar) {
+      const input = document.getElementById('answer-input');
+      const userAnswer = input.value.trim();
+      if (userAnswer === '') {
+        input.focus();
+        return;
+      }
+      isCorrect = compareGrammarAnswer(userAnswer, w);
+      correctAnswerDisplay = (w.topic_en || w.tr) + (w.topic_tr ? ` (${w.topic_tr})` : '');
     } else {
-      const correctAnswer = mode === 'en-tr' ? currentItem.word.tr : currentItem.word.en;
+      const input = document.getElementById('answer-input');
+      const userAnswer = input.value.trim();
+      if (userAnswer === '') {
+        input.focus();
+        return;
+      }
+      const correctAnswer = mode === 'en-tr' ? w.tr : w.en;
       isCorrect = compareAnswers(userAnswer, correctAnswer);
       correctAnswerDisplay = correctAnswer;
     }
@@ -654,12 +829,32 @@
     const continueBtn = document.getElementById('continue-btn');
 
     if (isCorrect) {
-      input.className = 'answer-input correct';
-      input.disabled = true;
+      if (!isGrammarTest) {
+        const input = document.getElementById('answer-input');
+        input.className = 'answer-input correct';
+        input.disabled = true;
+      }
       document.getElementById('submit-btn').disabled = true;
 
       feedback.className = 'feedback-message correct';
-      if (isGrammar) {
+      if (isGrammarTest) {
+        const blanks = w.blanks || [];
+        const answersStr = blanks.map((b, i) =>
+          `[${i+1}] <strong>${escapeHtml(b.answers[0])}</strong>`
+        ).join(' &nbsp;|&nbsp; ');
+
+        feedback.innerHTML = `
+          ✅ Harika! Doğru Tamamladın.
+          <div style="margin-top:6px; font-size:1.05rem; color:#10b981;">
+            ${answersStr}
+          </div>
+          ${w.explanation ? `
+            <div class="grammar-explanation-box">
+              <strong>💡 Kural / Açıklama:</strong> ${escapeHtml(w.explanation)}
+            </div>
+          ` : ''}
+        `;
+      } else if (isGrammar) {
         feedback.innerHTML = `
           ✅ Doğru!
           <span class="correct-answer"><strong>${escapeHtml(currentItem.word.topic_en || currentItem.word.tr)}</strong> ${currentItem.word.topic_tr ? `(${escapeHtml(currentItem.word.topic_tr)})` : ''} — <span style="color:#a78bfa;">[${escapeHtml(currentItem.word.formula_short || currentItem.word.en)}]</span></span>
@@ -703,15 +898,41 @@
       // ❌ WRONG — auto-star this word
       starWord(currentItem.word.id);
 
-      input.className = 'answer-input wrong';
-      input.disabled = true;
+      if (!isGrammarTest) {
+        const input = document.getElementById('answer-input');
+        input.className = 'answer-input wrong';
+        input.disabled = true;
+      }
       document.getElementById('submit-btn').disabled = true;
 
       feedback.className = 'feedback-message wrong';
-      feedback.innerHTML = `
-        ❌ Yanlış!
-        <span class="correct-answer">Doğru cevap: <strong>${escapeHtml(correctAnswerDisplay)}</strong></span>
-      `;
+      if (isGrammarTest) {
+        const blanks = w.blanks || [];
+        const answersStr = blanks.map((b, i) => {
+          const isBldCorrect = blankResults[i] && blankResults[i].isCorrect;
+          const statusIcon = isBldCorrect ? '✅' : '❌';
+          return `<span style="display:inline-block; margin:2px 6px;">
+            ${statusIcon} [${i+1}] <strong>${escapeHtml(b.answers.join(' / '))}</strong>
+          </span>`;
+        }).join('');
+
+        feedback.innerHTML = `
+          ❌ Yanlış veya Eksik!
+          <div style="margin-top:6px; font-size:1rem;">
+            Doğru cevaplar: ${answersStr}
+          </div>
+          ${w.explanation ? `
+            <div class="grammar-explanation-box">
+              <strong>💡 Kural / Açıklama:</strong> ${escapeHtml(w.explanation)}
+            </div>
+          ` : ''}
+        `;
+      } else {
+        feedback.innerHTML = `
+          ❌ Yanlış!
+          <span class="correct-answer">Doğru cevap: <strong>${escapeHtml(correctAnswerDisplay)}</strong></span>
+        `;
+      }
 
       if (currentItem.attempt < 3) {
         const reinsertItem = {
@@ -742,6 +963,62 @@
       isWaiting = true;
     }
   };
+
+  // ===== GAP FILL SMART ANSWER COMPARISON =====
+  function normalizeGapAnswer(str) {
+    if (!str) return '';
+    return str
+      .replace(/[‘’`]/g, "'")
+      .normalize('NFC')
+      .trim()
+      .toLowerCase()
+      .replace(/[.?!,;]+$/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function expandContractions(str) {
+    let s = ' ' + str + ' ';
+    const pairs = [
+      [/\bdidn't\b/g, 'did not'],
+      [/\bdoesn't\b/g, 'does not'],
+      [/\bdon't\b/g, 'do not'],
+      [/\bwasn't\b/g, 'was not'],
+      [/\bweren't\b/g, 'were not'],
+      [/\bisn't\b/g, 'is not'],
+      [/\baren't\b/g, 'are not'],
+      [/\bhaven't\b/g, 'have not'],
+      [/\bhasn't\b/g, 'has not'],
+      [/\bhadn't\b/g, 'had not'],
+      [/\bwon't\b/g, 'will not'],
+      [/\bcan't\b/g, 'cannot'],
+      [/\bcan not\b/g, 'cannot'],
+      [/\bcouldn't\b/g, 'could not'],
+      [/\bshouldn't\b/g, 'should not'],
+      [/\bmustn't\b/g, 'must not'],
+      [/\b'll\b/g, ' will'],
+      [/\b've\b/g, ' have'],
+      [/\b're\b/g, ' are'],
+      [/\b'm\b/g, ' am']
+    ];
+    for (const [re, rep] of pairs) {
+      s = s.replace(re, rep);
+    }
+    return s.replace(/\s+/g, ' ').trim();
+  }
+
+  function isGapAnswerCorrect(userAnswer, acceptedAnswers) {
+    if (!userAnswer || !acceptedAnswers || !Array.isArray(acceptedAnswers)) return false;
+    const userNorm = normalizeGapAnswer(userAnswer);
+    const userExpanded = expandContractions(userNorm);
+
+    for (const acc of acceptedAnswers) {
+      const accNorm = normalizeGapAnswer(acc);
+      if (userNorm === accNorm) return true;
+      if (userExpanded === expandContractions(accNorm)) return true;
+    }
+    return false;
+  }
 
   // ===== GRAMMAR SMART ANSWER COMPARISON =====
   function compareGrammarAnswer(userAnswer, item) {
@@ -876,8 +1153,8 @@
     const total = stats.firstTry + stats.retry + stats.hard + stats.unknown;
     const successRate = total > 0 ? Math.round(((stats.firstTry + stats.retry + stats.hard) / total) * 100) : 0;
     
-    const ds = new URLSearchParams(window.location.search).get('dataset');
-    const labelSoru = ds === 'grammar' ? 'soru' : 'kelime';
+    const ds = new URLSearchParams(window.location.search).get('dataset') || new URLSearchParams(window.location.search).get('category');
+    const labelSoru = (ds === 'grammar' || ds === 'grammar_test') ? 'soru' : 'kelime';
     document.getElementById('results-subtitle').textContent =
       `${total} ${labelSoru} çözüldü — %${successRate} başarı oranı`;
 
@@ -888,7 +1165,7 @@
     if (typeof logActivity === 'function') {
       const params = new URLSearchParams(window.location.search);
       logActivity('quiz_completed', {
-        dataset: params.get('dataset') || 'kurs',
+        dataset: params.get('dataset') || params.get('category') || 'kurs',
         mode: mode,
         total: total,
         firstTry: stats.firstTry,
@@ -946,13 +1223,17 @@
         row.className = 'word-list-row';
         // Star button: auto-starred if not firstTry
         const isAutoStarred = cat.key !== 'firstTry';
+        const wordEnText = word.category === 'grammar_test' ? (word.sentence || word.en) : word.en;
+        const wordTrText = word.category === 'grammar_test'
+          ? (word.topic + (word.blanks ? ' [' + word.blanks.map(b => b.answers[0]).join(', ') + ']' : ''))
+          : word.tr;
         row.innerHTML = `
           <button class="star-btn ${isAutoStarred ? 'starred' : ''}" onclick="toggleStar(${word.id}, this)" title="Yıldızla">
             ${isAutoStarred ? '★' : '☆'}
           </button>
-          <span class="word-en">${escapeHtml(word.en)}</span>
+          <span class="word-en">${escapeHtml(wordEnText)}</span>
           <span class="word-separator">—</span>
-          <span class="word-tr">${escapeHtml(word.tr)}</span>
+          <span class="word-tr">${escapeHtml(wordTrText)}</span>
         `;
         body.appendChild(row);
       });
@@ -985,45 +1266,58 @@
     document.getElementById('results-screen').classList.remove('visible');
 
     const params = new URLSearchParams(window.location.search);
-    let wordList;
-    const dataset = params.get('dataset') || 'kurs';
+    let wordList = [];
+    const category = params.get('category') || params.get('dataset') || 'vocab';
     const timesFilter = params.get('timesFilter');
 
-    let selectedData = WORDS_A2;
-    if (dataset === 'genel') selectedData = WORDS_A2_GENEL;
-    else if (dataset === 'grammar') selectedData = WORDS_A2_GRAMMAR;
-    else if (dataset === 'deyimler') selectedData = WORDS_A2_DEYIMLER;
-    else if (dataset === 'times') {
-      if (typeof WORDS_A2_TIMES_FULL !== 'undefined' && timesFilter) {
+    if (typeof DataManager !== 'undefined') {
+      if (category === 'times' && timesFilter && typeof WORDS_A2_TIMES_FULL !== 'undefined') {
         if (timesFilter === 'am') {
-          selectedData = WORDS_A2_TIMES_FULL.filter(w => {
-            const match = w.hintEn.match(/It is (\d{2}):/);
+          wordList = WORDS_A2_TIMES_FULL.filter(w => {
+            const match = w.hintEn ? w.hintEn.match(/It is (\d{2}):/) : null;
             return match && parseInt(match[1], 10) < 12;
           });
         } else if (timesFilter === 'pm') {
-          selectedData = WORDS_A2_TIMES_FULL.filter(w => {
-            const match = w.hintEn.match(/It is (\d{2}):/);
+          wordList = WORDS_A2_TIMES_FULL.filter(w => {
+            const match = w.hintEn ? w.hintEn.match(/It is (\d{2}):/) : null;
             return match && parseInt(match[1], 10) >= 12;
           });
         } else {
-          selectedData = WORDS_A2_TIMES_FULL.filter(w => w.hintEn.includes(`It is ${timesFilter}:`));
+          wordList = WORDS_A2_TIMES_FULL.filter(w => w.hintEn && w.hintEn.includes(`It is ${timesFilter}:`));
         }
       } else {
-        selectedData = WORDS_A2_TIMES;
+        wordList = DataManager.getItemsByCategory(category);
       }
+    } else {
+      let selectedData = typeof WORDS_A2 !== 'undefined' ? WORDS_A2 : [];
+      if (category === 'genel' && typeof WORDS_A2_GENEL !== 'undefined') selectedData = WORDS_A2_GENEL;
+      else if (category === 'grammar' && typeof WORDS_A2_GRAMMAR !== 'undefined') selectedData = WORDS_A2_GRAMMAR;
+      else if (category === 'grammar_test' && typeof GRAMMAR_TEST_DATA !== 'undefined') selectedData = GRAMMAR_TEST_DATA;
+      else if (category === 'deyimler' && typeof WORDS_A2_DEYIMLER !== 'undefined') selectedData = WORDS_A2_DEYIMLER;
+      else if (category === 'times' && typeof WORDS_A2_TIMES !== 'undefined') selectedData = WORDS_A2_TIMES;
+      wordList = [...selectedData];
     }
 
     if (isCustomQuiz) {
       const customIds = JSON.parse(localStorage.getItem('custom_quiz_ids') || '[]');
-      wordList = ALL_WORDS_A2.filter(w => customIds.includes(w.id));
+      const allItems = typeof DataManager !== 'undefined' ? DataManager.getAllItems() : (typeof ALL_WORDS_A2 !== 'undefined' ? ALL_WORDS_A2 : []);
+      wordList = allItems.filter(w => customIds.includes(w.id));
     } else {
-      const level = params.get('level') || 'a2';
-      wordList = level === 'a2' ? [...selectedData] : [];
       if (params.get('exclude') === 'true') {
         const excludeIds = JSON.parse(localStorage.getItem('exclude_quiz_ids') || '[]');
         wordList = wordList.filter(w => !excludeIds.includes(w.id));
       }
     }
+
+    if (!wordList || wordList.length === 0) {
+      if (category === 'grammar_test' && typeof GRAMMAR_TEST_DATA !== 'undefined') {
+        wordList = [...GRAMMAR_TEST_DATA];
+      } else {
+        wordList = typeof DataManager !== 'undefined' ? DataManager.getItemsByCategory('vocab') : [];
+      }
+    }
+
+    totalWords = wordList.length;
 
     queue = wordList.map(w => ({ word: w, attempt: 1 }));
     shuffleArray(queue);

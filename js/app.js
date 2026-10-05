@@ -136,6 +136,11 @@ function showHourFilters() {
   }, 10);
 }
 
+// ===== START GRAMMAR GAP-FILL TEST =====
+function startGrammarTest() {
+  window.location.href = 'quiz.html?category=grammar_test&mode=gap-fill';
+}
+
 // ===== START QUIZ WITH KNOWN-WORDS FILTER =====
 async function startQuiz(mode) {
   let url = `quiz.html?category=${currentCategory}&mode=${mode}`;

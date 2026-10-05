@@ -1,5 +1,5 @@
-const CACHE_NAME = 'personel-notebook-shell-v2';
-const DATA_CACHE_NAME = 'personel-notebook-data-v2';
+const CACHE_NAME = 'personel-notebook-shell-v3';
+const DATA_CACHE_NAME = 'personel-notebook-data-v3';
 
 const STATIC_ASSETS = [
   '/',
@@ -50,6 +50,7 @@ const STATIC_ASSETS = [
   '/js/data/categories.js',
   '/js/data/words.js',
   '/js/data/grammar.js',
+  '/js/data/grammar-test.js',
   '/js/data/sentences.js',
   '/js/data/idioms.js',
   '/js/data/times.js',

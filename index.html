@@ -162,7 +162,7 @@
         <span class="category-icon">⚡</span>
         <h3>Gramer Formülleri</h3>
         <p>Formülü gör, doğru konuyu yaz</p>
-        <span class="category-badge-count" id="count-grammar" style="color: #a78bfa; background: rgba(139,92,246,0.15);">13 Temel Tense</span>
+        <span class="category-badge-count" id="count-grammar" style="color: #a78bfa; background: rgba(139,92,246,0.15);">37 Konu & Test</span>
       </div>
 
       <!-- 3. Cümleler -->
@@ -238,17 +238,22 @@
 
     <!-- Grammar Direct Action Section (Gramer Seçilince Görünür) -->
     <div class="mode-section" id="grammar-action-section" style="display: none;">
-      <h2 class="mode-title">⚡ Gramer Formülleri Pratiği</h2>
+      <h2 class="mode-title">⚡ Gramer Pratiği Modunu Seç</h2>
       <div class="mode-grid">
-        <a class="mode-card" href="#" onclick="startQuiz('formula-topic'); return false;" style="grid-column: span 2; border-color: var(--accent-purple); background: rgba(139, 92, 246, 0.08);">
+        <a class="mode-card" href="#" onclick="startQuiz('formula-topic'); return false;" style="border-color: var(--accent-purple); background: rgba(139, 92, 246, 0.08);">
           <span class="mode-flags">📐 → ✍️</span>
-          <h3>Formül Quizi Başlat</h3>
+          <h3>Formül Quizi</h3>
           <p>Kısa ve uzun formülü gör, doğru Tense / Gramer konusunu yaz!</p>
+        </a>
+        <a class="mode-card" href="#" onclick="startGrammarTest(); return false;" style="border-color: #10b981; background: rgba(16, 185, 129, 0.08);">
+          <span class="mode-flags">📝 → 🔤</span>
+          <h3>Gramer Testi (Boşluk Doldurma)</h3>
+          <p>Cümledeki boşlukları doğru gramer kuralıyla doldur (saf İngilizce)!</p>
         </a>
       </div>
       <div class="action-sub-buttons">
         <a href="study.html?category=grammar" class="btn-secondary">📖 Flashcard Olarak Çalış</a>
-        <a href="category.html?category=grammar" class="btn-secondary">📋 Tüm Formül Listesini İncele</a>
+        <a href="category.html?category=grammar" class="btn-secondary">📋 Tüm Konu & Formül Listesini İncele</a>
       </div>
     </div>
 
@@ -280,6 +285,7 @@
   <script src="js/data/categories.js"></script>
   <script src="js/data/words.js"></script>
   <script src="js/data/grammar.js"></script>
+  <script src="js/data/grammar-test.js"></script>
   <script src="js/data/sentences.js"></script>
   <script src="js/data/idioms.js"></script>
   <script src="js/data/times.js"></script>

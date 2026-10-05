@@ -41,6 +41,11 @@ const DataManager = (function() {
     if (typeof global !== 'undefined' && global.IRREGULAR_VERBS_DATA) return global.IRREGULAR_VERBS_DATA;
     try { return require('./irregular-verbs.js'); } catch (e) { return []; }
   }
+  function getGrammarTest() {
+    if (typeof GRAMMAR_TEST_DATA !== 'undefined') return GRAMMAR_TEST_DATA;
+    if (typeof global !== 'undefined' && global.GRAMMAR_TEST_DATA) return global.GRAMMAR_TEST_DATA;
+    try { return require('./grammar-test.js'); } catch (e) { return []; }
+  }
   function getCategories() { 
     if (typeof CATEGORIES !== 'undefined') return CATEGORIES;
     if (typeof global !== 'undefined' && global.CATEGORIES) return global.CATEGORIES;
@@ -51,6 +56,7 @@ const DataManager = (function() {
   const categoryMap = {
     'vocab': getVocab,
     'grammar': getGrammar,
+    'grammar_test': getGrammarTest,
     'sentences': getSentences,
     'idioms': getIdioms,
     'times': getTimes,
@@ -84,6 +90,7 @@ const DataManager = (function() {
       return [
         ...getVocab(),
         ...getGrammar(),
+        ...getGrammarTest(),
         ...getSentences(),
         ...getIdioms(),
         ...getTimes(),
