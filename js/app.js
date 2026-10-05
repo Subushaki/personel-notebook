@@ -1,59 +1,40 @@
-// Main page - Level & Mode selection logic
+// ===== PERSONEL NOTEBOOK - MAIN APP LOGIC =====
+// Kategori seçimi, mod yönetimi ve quiz başlatma motoru
 
-let currentLevel = '';
-let currentDataset = '';
-
-function selectLevel(level) {
-  if (level !== 'a2') return;
-  currentLevel = level;
-
-  // Highlight selected level
-  document.querySelectorAll('.level-card').forEach(card => card.classList.remove('active'));
-  document.getElementById('level-' + level).classList.add('active');
-
-  // Hide mode section if it was open
-  document.getElementById('mode-section').classList.remove('visible');
-  document.getElementById('mode-section').style.display = 'none';
-
-  // Show dataset selection
-  const datasetSection = document.getElementById('dataset-section');
-  datasetSection.style.display = 'block';
-  setTimeout(() => {
-    datasetSection.classList.add('visible');
-    datasetSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, 10);
-}
-
+let currentCategory = 'vocab';
 let currentTimesFilter = '';
 
-function selectDataset(dataset) {
-  currentDataset = dataset;
-  currentTimesFilter = ''; // reset filter
-  
-  if (dataset === 'grammar') {
-    startQuiz('en-tr'); // Forced en-tr mapping where en=question tr=answer
-    return;
-  }
+function selectCategory(categorySlug) {
+  currentCategory = categorySlug;
+  currentTimesFilter = '';
 
-  // Highlight selected dataset card
-  document.querySelectorAll('#dataset-section .mode-card').forEach(card => {
-    card.classList.remove('active');
-    card.style.borderColor = 'var(--glass-border)';
-    card.style.background = 'var(--bg-card)';
-  });
-  const activeCard = document.getElementById('dataset-' + dataset);
+  // Highlight selected category card
+  document.querySelectorAll('.category-card').forEach(card => card.classList.remove('active'));
+  const activeCard = document.getElementById('cat-' + categorySlug);
   if (activeCard) {
     activeCard.classList.add('active');
-    activeCard.style.borderColor = 'var(--accent-blue)';
-    activeCard.style.background = 'rgba(59, 130, 246, 0.05)';
   }
 
-  // Hide everything first
-  document.getElementById('mode-section').style.display = 'none';
+  // Hide all dynamic sub-sections first
   document.getElementById('times-filter-section').style.display = 'none';
   document.getElementById('hour-filter-section').style.display = 'none';
+  document.getElementById('grammar-action-section').style.display = 'none';
+  document.getElementById('mode-section').style.display = 'none';
 
-  if (dataset === 'times') {
+  // Sub-links update (study & list)
+  const studyBtn = document.getElementById('btn-study-link');
+  const listBtn = document.getElementById('btn-list-link');
+  if (studyBtn) studyBtn.href = `study.html?category=${categorySlug}`;
+  if (listBtn) listBtn.href = `category.html?category=${categorySlug}`;
+
+  if (categorySlug === 'grammar') {
+    const gramSection = document.getElementById('grammar-action-section');
+    gramSection.style.display = 'block';
+    setTimeout(() => {
+      gramSection.classList.add('visible');
+      gramSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 10);
+  } else if (categorySlug === 'times') {
     const timesSection = document.getElementById('times-filter-section');
     timesSection.style.display = 'block';
     setTimeout(() => {
@@ -61,56 +42,84 @@ function selectDataset(dataset) {
       timesSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 10);
   } else {
-    showModeSection();
+    const modeSection = document.getElementById('mode-section');
+    const catObj = typeof DataManager !== 'undefined' ? DataManager.getCategoryById(categorySlug) : null;
+    const titleEl = document.getElementById('mode-section-title');
+    if (titleEl && catObj) {
+      titleEl.textContent = `${catObj.icon} ${catObj.name} - Pratik Modunu Seç`;
+    }
+    modeSection.style.display = 'block';
+    setTimeout(() => {
+      modeSection.classList.add('visible');
+      modeSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 10);
   }
+}
+
+// Backward compatibility bridge
+function selectLevel(level) {
+  selectCategory('vocab');
+}
+
+function selectDataset(dataset) {
+  const map = {
+    'kurs': 'vocab',
+    'genel': 'vocab',
+    'grammar': 'grammar',
+    'deyimler': 'idioms',
+    'times': 'times'
+  };
+  selectCategory(map[dataset] || dataset);
 }
 
 function selectTimesFilter(filter) {
   currentTimesFilter = filter;
 
-  // Highlight times filter card (first un-highlight all)
+  // Highlight selected card
   document.querySelectorAll('#times-filter-section .mode-card, #hour-filter-section .mode-card').forEach(card => {
     card.style.borderColor = 'var(--glass-border)';
     card.style.background = 'var(--bg-card)';
   });
-  
+
   if (filter === 'am' || filter === 'pm') {
-    // If AM or PM is selected, hide the hour section
     document.getElementById('hour-filter-section').style.display = 'none';
-    
     const cards = document.querySelectorAll('#times-filter-section .mode-card');
     const idx = filter === 'am' ? 0 : 1;
-    if(cards[idx]) {
-      cards[idx].style.borderColor = 'var(--accent-blue)';
-      cards[idx].style.background = 'rgba(59, 130, 246, 0.05)';
+    if (cards[idx]) {
+      cards[idx].style.borderColor = 'var(--accent-purple)';
+      cards[idx].style.background = 'rgba(139, 92, 246, 0.08)';
     }
   } else {
-    // If specific hour is selected, KEEP the hour section visible!
-    // But remove selection from am/pm cards
     const card = document.getElementById('hour-card-' + filter);
-    if(card) {
-      card.style.borderColor = 'var(--accent-blue)';
-      card.style.background = 'rgba(59, 130, 246, 0.05)';
+    if (card) {
+      card.style.borderColor = 'var(--accent-purple)';
+      card.style.background = 'rgba(139, 92, 246, 0.08)';
     }
   }
 
-  showModeSection();
+  // Show standard mode section for times
+  const modeSection = document.getElementById('mode-section');
+  const titleEl = document.getElementById('mode-section-title');
+  if (titleEl) titleEl.textContent = '⏰ Saatler Pratik Modunu Seç';
+  modeSection.style.display = 'block';
+  setTimeout(() => {
+    modeSection.classList.add('visible');
+    modeSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 10);
 }
 
 function showHourFilters() {
   const hourSection = document.getElementById('hour-filter-section');
   const hourGrid = document.getElementById('hour-grid');
-  
-  // Unselect am/pm cards visually
+
   document.querySelectorAll('#times-filter-section .mode-card').forEach(card => {
     card.style.borderColor = 'var(--glass-border)';
     card.style.background = 'var(--bg-card)';
   });
-  
+
   if (hourGrid.children.length === 0) {
     for (let i = 0; i < 24; i++) {
       const hh = i.toString().padStart(2, '0');
-      const nextHh = ((i+1)%24).toString().padStart(2, '0');
       hourGrid.innerHTML += `
         <a class="mode-card" id="hour-card-${hh}" href="#" onclick="selectTimesFilter('${hh}'); return false;" style="padding: 10px; min-height: 70px;">
           <h3 style="font-size: 1.1rem; margin-bottom: 2px;">${hh}:00</h3>
@@ -119,7 +128,7 @@ function showHourFilters() {
       `;
     }
   }
-  
+
   hourSection.style.display = 'block';
   setTimeout(() => {
     hourSection.classList.add('visible');
@@ -127,31 +136,20 @@ function showHourFilters() {
   }, 10);
 }
 
-function showModeSection() {
-  const modeSection = document.getElementById('mode-section');
-  modeSection.style.display = 'block';
-  setTimeout(() => {
-    modeSection.classList.add('visible');
-    modeSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, 10);
-}
-
-// Intercept quiz start
+// ===== START QUIZ WITH KNOWN-WORDS FILTER =====
 async function startQuiz(mode) {
-  // Check if user is logged in
-  const user = await getCurrentUser();
-  let url = `quiz.html?level=${currentLevel}&dataset=${currentDataset}&mode=${mode}`;
-  if (currentDataset === 'times' && currentTimesFilter) {
+  let url = `quiz.html?category=${currentCategory}&mode=${mode}`;
+  if (currentCategory === 'times' && currentTimesFilter) {
     url += `&timesFilter=${currentTimesFilter}`;
   }
 
+  const user = typeof getCurrentUser === 'function' ? await getCurrentUser() : null;
   if (!user || !user.id) {
     window.location.href = url;
     return;
   }
 
   // Fetch word results to see if there are known words
-  // CHECK CACHE FOR INSTANT LOAD (1ST DEGREE PRIORITY)
   let wordResults = null;
   const cacheKey = 'cachedWordResults_' + user.id;
   const cachedData = sessionStorage.getItem(cacheKey);
@@ -159,12 +157,16 @@ async function startQuiz(mode) {
   if (cachedData) {
     wordResults = JSON.parse(cachedData);
   } else {
-    const sb = getSupabase();
-    const res = await sb
-      .from('word_results').select('word_id, result').eq('user_id', user.id).limit(50000);
-    wordResults = res.data;
-    if (wordResults && wordResults.length > 0) {
-      sessionStorage.setItem(cacheKey, JSON.stringify(wordResults));
+    try {
+      const sb = getSupabase();
+      const res = await sb
+        .from('word_results').select('word_id, result').eq('user_id', user.id).limit(50000);
+      wordResults = res.data;
+      if (wordResults && wordResults.length > 0) {
+        sessionStorage.setItem(cacheKey, JSON.stringify(wordResults));
+      }
+    } catch (e) {
+      wordResults = [];
     }
   }
 
@@ -183,15 +185,12 @@ async function startQuiz(mode) {
 
   const globalKnownWordIds = Object.entries(bestResults)
     .filter(([_, r]) => r === 'first_try')
-    .map(([id, _]) => parseInt(id));
+    .map(([id, _]) => parseInt(id, 10));
 
-  // Dataset'i belirle ve sadece o paketteki bildiklerini say
-  let selectedData = typeof WORDS_A2 !== 'undefined' ? WORDS_A2 : [];
-  if (currentDataset === 'genel' && typeof WORDS_A2_GENEL !== 'undefined') selectedData = WORDS_A2_GENEL;
-  else if (currentDataset === 'grammar' && typeof WORDS_A2_GRAMMAR !== 'undefined') selectedData = WORDS_A2_GRAMMAR;
-  else if (currentDataset === 'deyimler' && typeof WORDS_A2_DEYIMLER !== 'undefined') selectedData = WORDS_A2_DEYIMLER;
-  else if (currentDataset === 'times') {
-    if (typeof WORDS_A2_TIMES_FULL !== 'undefined' && currentTimesFilter) {
+  // Bu kategorideki öğelerin ID'leri
+  let selectedData = [];
+  if (typeof DataManager !== 'undefined') {
+    if (currentCategory === 'times' && currentTimesFilter && typeof WORDS_A2_TIMES_FULL !== 'undefined') {
       if (currentTimesFilter === 'am') {
         selectedData = WORDS_A2_TIMES_FULL.filter(w => {
           const match = w.hintEn ? w.hintEn.match(/It is (\d{2}):/) : null;
@@ -205,20 +204,17 @@ async function startQuiz(mode) {
       } else {
         selectedData = WORDS_A2_TIMES_FULL.filter(w => w.hintEn && w.hintEn.includes(`It is ${currentTimesFilter}:`));
       }
-    } else if (typeof WORDS_A2_TIMES !== 'undefined') {
-      selectedData = WORDS_A2_TIMES;
+    } else {
+      selectedData = DataManager.getItemsByCategory(currentCategory);
     }
   }
 
-  // Bu paketteki kelimelerin ID'leri
   const selectedDataIds = new Set(selectedData.map(w => w.id));
-
-  // Sadece bu pakette olan ve bilinen kelimeleri filtrele
   const relevantKnownWordIds = globalKnownWordIds.filter(id => selectedDataIds.has(id));
 
   if (relevantKnownWordIds.length > 0) {
     const includeKnown = confirm(
-      `Seçtiğiniz pakette "İlk Seferde" bildiğiniz ${relevantKnownWordIds.length} kelime var.\n\nDaha önceki bildikleriniz bu quize dahil edilsin mi?\n\n- Tamam: Tüm kelimelerle başlatır\n- İptal: Sadece bilmediğin kelimelerle başlatır`
+      `Seçtiğiniz kategoride "İlk Seferde" bildiğiniz ${relevantKnownWordIds.length} öğe var.\n\nDaha önceki bildikleriniz bu quize dahil edilsin mi?\n\n- Tamam: Tüm içerikle başlatır\n- İptal: Sadece bilmediğin veya zorlandığın içerikle başlatır`
     );
 
     if (includeKnown) {
@@ -234,10 +230,26 @@ async function startQuiz(mode) {
 
 // ===== DYNAMIC WORD COUNTS FOR INDEX UI =====
 document.addEventListener('DOMContentLoaded', () => {
-  if (document.getElementById('desc-genel') && typeof WORDS_A2_GENEL !== 'undefined') {
-    document.getElementById('desc-genel').textContent = `${WORDS_A2_GENEL.length} Kelimelik özel liste`;
-  }
-  if (document.getElementById('desc-grammar') && typeof WORDS_A2_GRAMMAR !== 'undefined') {
-    document.getElementById('desc-grammar').textContent = `${WORDS_A2_GRAMMAR.length} Soruluk Pronouns Testi`;
+  if (typeof DataManager !== 'undefined') {
+    const vCount = DataManager.getItemsByCategory('vocab').length;
+    const gCount = DataManager.getItemsByCategory('grammar').length;
+    const sCount = DataManager.getItemsByCategory('sentences').length;
+    const iCount = DataManager.getItemsByCategory('idioms').length;
+    const pCount = DataManager.getItemsByCategory('phrasal_verbs').length;
+    const irCount = DataManager.getItemsByCategory('irregular_verbs').length;
+
+    const elV = document.getElementById('count-vocab');
+    const elG = document.getElementById('count-grammar');
+    const elS = document.getElementById('count-sentences');
+    const elI = document.getElementById('count-idioms');
+    const elP = document.getElementById('count-phrasal_verbs');
+    const elIr = document.getElementById('count-irregular_verbs');
+
+    if (elV && vCount) elV.textContent = `${vCount} Kelime`;
+    if (elG && gCount) elG.textContent = `${gCount} Konu / Tense`;
+    if (elS && sCount) elS.textContent = `${sCount} Kalıp Cümle`;
+    if (elI && iCount) elI.textContent = `${iCount} Deyim`;
+    if (elP && pCount) elP.textContent = `${pCount} Fiil`;
+    if (elIr && irCount) elIr.textContent = `${irCount} Fiil`;
   }
 });

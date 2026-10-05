@@ -191,6 +191,16 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase-config.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/data/categories.js"></script>
+  <script src="js/data/words.js"></script>
+  <script src="js/data/grammar.js"></script>
+  <script src="js/data/sentences.js"></script>
+  <script src="js/data/idioms.js"></script>
+  <script src="js/data/times.js"></script>
+  <script src="js/data/phrasal-verbs.js"></script>
+  <script src="js/data/irregular-verbs.js"></script>
+  <script src="js/data/all-data.js"></script>
+  <script src="js/words-a2-saatler-full.js"></script>
   <script src="js/words-a2.js"></script>
   <script>
     let studyQueue = [];
@@ -204,23 +214,24 @@
 
     async function markKnown() {
       if (!currentStudy) return;
-      // Mark as mastered + unstar in Supabase
-      const sb = getSupabase();
-      await sb.from('study_words').update({ mastered: true, starred: false })
-        .eq('user_id', currentUser.id).eq('word_id', currentStudy.id);
+      if (currentUser && currentUser.id) {
+        try {
+          const sb = getSupabase();
+          await sb.from('study_words').update({ mastered: true, starred: false })
+            .eq('user_id', currentUser.id).eq('word_id', currentStudy.id);
+        } catch (e) {}
+      }
       nextStudyCard();
     }
 
     function markUnknown() {
       if (!currentStudy) return;
-      // Just move to next, keep in study list
       nextStudyCard();
     }
 
     function nextStudyCard() {
       studyIndex++;
       if (studyIndex >= studyQueue.length) {
-        // All done
         document.getElementById('study-content').style.display = 'none';
         document.getElementById('study-empty').style.display = 'block';
         return;
@@ -231,15 +242,55 @@
     function showStudyCard() {
       currentStudy = studyQueue[studyIndex];
       document.getElementById('flashcard').classList.remove('flipped');
-      document.getElementById('fc-front-word').textContent = currentStudy.en;
-      document.getElementById('fc-back-word').textContent = currentStudy.tr;
+
+      const isGrammar = currentStudy.category === 'grammar' || !!currentStudy.formula_short;
+      if (isGrammar) {
+        document.getElementById('fc-front-label').textContent = '⚡ FORMÜL';
+        document.getElementById('fc-front-word').innerHTML = `
+          <div style="font-family: monospace; color: #a78bfa; font-size: 1.5rem; margin-bottom: 8px;">${currentStudy.formula_short || currentStudy.en}</div>
+          ${currentStudy.formula_long ? `<div style="font-size: 0.9rem; color: var(--text-muted); font-weight: normal;">${currentStudy.formula_long}</div>` : ''}
+        `;
+        document.getElementById('fc-back-label').textContent = 'GRAMER KONUSU';
+        document.getElementById('fc-back-word').innerHTML = `
+          <div style="color: var(--text-primary); font-size: 1.5rem; margin-bottom: 8px;">${currentStudy.topic_en || currentStudy.tr}</div>
+          <div style="font-size: 1rem; color: var(--accent-purple); font-weight: 600;">${currentStudy.topic_tr || ''}</div>
+          ${currentStudy.forms && currentStudy.forms.positive ? `<div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 10px; font-style: italic;">"${currentStudy.forms.positive.example}"</div>` : ''}
+        `;
+      } else {
+        document.getElementById('fc-front-label').textContent = 'İngilizce';
+        document.getElementById('fc-front-word').textContent = currentStudy.en;
+        document.getElementById('fc-back-label').textContent = 'Türkçe';
+        document.getElementById('fc-back-word').textContent = currentStudy.tr;
+      }
+
       document.getElementById('study-progress').textContent =
         `${studyIndex + 1} / ${studyQueue.length}`;
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
-      const user = await getCurrentUser();
+      const params = new URLSearchParams(window.location.search);
+      const catSlug = params.get('category');
+
       document.getElementById('study-loading').style.display = 'none';
+
+      // OPTION 1: Study specific category directly (e.g. study.html?category=grammar)
+      if (catSlug && typeof DataManager !== 'undefined') {
+        const items = DataManager.getItemsByCategory(catSlug);
+        if (items && items.length > 0) {
+          studyQueue = [...items];
+          // Shuffle
+          for (let i = studyQueue.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [studyQueue[i], studyQueue[j]] = [studyQueue[j], studyQueue[i]];
+          }
+          document.getElementById('study-content').style.display = 'flex';
+          showStudyCard();
+          return;
+        }
+      }
+
+      // OPTION 2: Study user unmastered words from database
+      const user = typeof getCurrentUser === 'function' ? await getCurrentUser() : null;
 
       if (!user || !user.id) {
         document.getElementById('study-no-login').style.display = 'block';
@@ -257,13 +308,16 @@
         return;
       }
 
-      // Build study queue from word IDs
       studyWords.forEach(sw => {
-        const word = ALL_WORDS_A2.find(w => w.id === sw.word_id);
-        if (word) studyQueue.push(word);
+        const item = typeof DataManager !== 'undefined' ? DataManager.getItemById(sw.word_id) : null;
+        if (item) studyQueue.push(item);
       });
 
-      // Shuffle
+      if (studyQueue.length === 0) {
+        document.getElementById('study-empty').style.display = 'block';
+        return;
+      }
+
       for (let i = studyQueue.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [studyQueue[i], studyQueue[j]] = [studyQueue[j], studyQueue[i]];

@@ -160,14 +160,10 @@ async function updateUserBar() {
     let navItems = mobileNotif;
     navItems += '<a href="inbox.html" class="burger-nav-item"><span class="burger-nav-icon">📥</span> Gelen Kutusu</a>';
 
-    const chatUrl = 'chat.html';
-    const isChat = window.location.pathname.includes('chat.html');
-
     if (!isIndex) navItems += '<a href="index.html" class="burger-nav-item"><span class="burger-nav-icon">🏠</span> Ana Sayfa</a>';
     if (!isDashboard) navItems += '<a href="dashboard.html" class="burger-nav-item"><span class="burger-nav-icon">📊</span> Panelim</a>';
     if (!isLeaderboard) navItems += '<a href="leaderboard.html" class="burger-nav-item"><span class="burger-nav-icon">🥇</span> Skor Tablosu</a>';
     if (!isO2) navItems += '<a href="o2.html" class="burger-nav-item"><span class="burger-nav-icon">🔍</span> O₂ Oxygen</a>';
-    if (!isChat) navItems += `<a href="${chatUrl}" class="burger-nav-item"><span class="burger-nav-icon">💬</span> Global Sohbet</a>`;
     if (!isProfile) navItems += '<a href="profile.html?id=' + user.id + '" class="burger-nav-item"><span class="burger-nav-icon">👤</span> Profilim</a>';
     if (!isSettings) navItems += '<a href="settings.html" class="burger-nav-item"><span class="burger-nav-icon">⚙️</span> Ayarlar</a>';
 
@@ -182,7 +178,6 @@ async function updateUserBar() {
     const panelBtn = isDashboard ? '' : '<a href="dashboard.html" class="user-bar-btn desktop-nav"><span class="settings-btn-icon">📊</span> Panelim</a>';
     const lbBtn = isLeaderboard ? '' : '<a href="leaderboard.html" class="user-bar-btn desktop-nav"><span class="settings-btn-icon">🥇</span> Skor</a>';
     const o2Btn = isO2 ? '' : '<a href="o2.html" class="user-bar-btn desktop-nav" style="border-color: rgba(251,191,36,0.2); color: #fbbf24;"><span class="settings-btn-icon">🔍</span> O₂</a>';
-    const chatBtn = isChat ? '' : `<a href="${chatUrl}" class="user-bar-btn desktop-nav" style="border-color: rgba(59, 130, 246, 0.3); color: #60a5fa; font-weight: bold;"><span class="settings-btn-icon">💬</span> Sohbet</a>`;
     const profileBtn = isProfile ? '' : '<a href="profile.html?id=' + user.id + '" class="user-bar-btn desktop-nav"><span class="settings-btn-icon">👤</span> Profilim</a>';
     const settingsBtn = isSettings ? '' : '<a href="settings.html" class="user-bar-btn desktop-nav"><span class="settings-btn-icon">⚙️</span> Ayarlar</a>';
 
@@ -211,7 +206,6 @@ async function updateUserBar() {
       ${panelBtn}
       ${lbBtn}
       ${o2Btn}
-      ${chatBtn}
       <span class="nav-divider desktop-nav"></span>
       ${profileBtn}
       ${settingsBtn}
@@ -346,6 +340,49 @@ window.promptChangeUsername = async function () {
   window.location.reload(); // Üst bardaki metnin güncellenmesi için sayfayı yenile
 };
 
+window.promptChangePassword = async function () {
+  const user = await getCurrentUser();
+  if (!user) return;
+
+  const newPass = prompt("Yeni şifrenizi girin (en az 4 karakter):");
+  if (!newPass || newPass.trim() === "") {
+    return; // İptal edildi veya boş
+  }
+
+  const trimmedPass = newPass.trim();
+  if (trimmedPass.length < 4) {
+    alert("Şifre en az 4 karakter olmalıdır.");
+    return;
+  }
+
+  const confirmPass = prompt("Yeni şifrenizi tekrar girin:");
+  if (confirmPass === null) return; // İptal
+
+  if (trimmedPass !== confirmPass.trim()) {
+    alert("Şifreler eşleşmiyor!");
+    return;
+  }
+
+  const sb = getSupabase();
+  if (!sb) { alert("Bağlantı hatası"); return; }
+
+  // Hash new password using current salt
+  const passHash = await hashPassword(trimmedPass);
+
+  // Update password in DB
+  const { data, error } = await sb.from('profiles').update({ password_hash: passHash }).eq('id', user.id).select();
+  if (error || !data || data.length === 0) {
+    alert("Bağlantı başarılı fakat şifre güncellenemedi.\n\nSebep: Supabase 'profiles' tablosunda UPDATE izniniz (RLS Policy) yok. Lütfen Supabase'den profiles tablosuna UPDATE policy ekleyin.");
+    return;
+  }
+
+  if (typeof logActivity === 'function') {
+    logActivity('password_changed', {});
+  }
+
+  alert("Şifreniz başarıyla değiştirildi.");
+};
+
 window.confirmResetData = async function () {
   if (confirm("Tüm ilerlemenizi, yıldızlı kelimeleri ve geçmiş quiz oturumlarınızı silmek istediğinize emin misiniz? Bu işlem geri alınamaz!")) {
     const user = await getCurrentUser();
@@ -439,23 +476,7 @@ modal.classList.add('open');
     if (error) throw error;
 
     let adminHtml = '';
-    if (user.is_admin) {
-      try {
-        const { count: repCount } = await sb.from('chat_reports').select('*', { count: 'exact', head: true }).eq('status', 'pending');
-        
-        if (repCount > 0) {
-          adminHtml += `
-            <div style="padding: 20px; border-bottom: 1px solid var(--glass-border); background: rgba(239, 68, 68, 0.05); display: flex; flex-direction: column; gap: 8px;">
-              <div style="font-weight: 600; color: var(--text-primary); display:flex; justify-content:space-between; align-items: flex-start; gap: 10px;">
-                <span>🚩 Sohbet Şikayeti</span>
-                <span style="color:var(--accent-red); font-size:0.7rem; padding:3px 8px; border-radius:12px; background:rgba(239,68,68,0.15); font-weight:700; flex-shrink:0;">${repCount} ADET</span>
-              </div>
-              <div style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.4;">İncelenmeyi bekleyen ${repCount} adet sohbet şikayeti bulunuyor.</div>
-              <a href="admin-chat.html" style="color: var(--accent-red); font-size: 0.85rem; font-weight: 600; text-decoration: none; margin-top: 5px; cursor: pointer;">İncele →</a>
-            </div>`;
-        }
-      } catch (e) { /* ignore */ }
-    }
+
 
     if (!data || data.length === 0) {
       if (adminHtml === '') {

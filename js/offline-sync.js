@@ -259,8 +259,21 @@ const OfflineSync = (() => {
       // Register Service Worker
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js')
-          .then(reg => console.log('[Service Worker] Registered successfully:', reg.scope))
+          .then(reg => {
+            console.log('[Service Worker] Registered successfully:', reg.scope);
+            // Proactively check for SW updates
+            reg.update().catch(() => {});
+          })
           .catch(err => console.error('[Service Worker] Registration failed:', err));
+
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!refreshing) {
+            refreshing = true;
+            console.log('[Service Worker] New Service Worker activated, refreshing page...');
+            window.location.reload();
+          }
+        });
       }
     });
 

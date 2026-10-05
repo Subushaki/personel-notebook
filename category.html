@@ -101,6 +101,16 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase-config.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/data/categories.js"></script>
+  <script src="js/data/words.js"></script>
+  <script src="js/data/grammar.js"></script>
+  <script src="js/data/sentences.js"></script>
+  <script src="js/data/idioms.js"></script>
+  <script src="js/data/times.js"></script>
+  <script src="js/data/phrasal-verbs.js"></script>
+  <script src="js/data/irregular-verbs.js"></script>
+  <script src="js/data/all-data.js"></script>
+  <script src="js/words-a2-saatler-full.js"></script>
   <script src="js/words-a2.js"></script>
   <script>
     let loggedUser = null;
@@ -108,7 +118,7 @@
     let categoryWords = [];
     let starredWordIds = new Set();
     
-    // Config mappings
+    // Config mappings for dashboard status types
     const typeConfig = {
       'first_try': { icon: '⚡', text: 'İlk Seferde Bilinenler', colorClass: 'wl-first' },
       'retry': { icon: '🔄', text: 'Tekrarda Öğrenilenler', colorClass: 'wl-retry' },
@@ -117,8 +127,8 @@
       'starred': { icon: '⭐', text: 'Yıldızlanan Kelimeler', colorClass: 'wl-starred' }
     };
 
-    // Toggle star function (frontend only visually, user said new sys later but lets keep exact DB logic to not break)
     async function toggleStarInList(wordId, btn) {
+      if (!loggedUser || !loggedUser.id) return;
       const sb = getSupabase();
       const isStarred = btn.classList.contains('starred');
 
@@ -144,43 +154,112 @@
     function createWordRow(word, isStarred) {
       const row = document.createElement('div');
       row.className = 'word-list-row';
-      row.innerHTML = `
-        <button class="star-btn ${isStarred ? 'starred' : ''}"
-                onclick="toggleStarInList(${word.id}, this)" title="Yıldızla">
-          ${isStarred ? '★' : '☆'}
-        </button>
-        <span class="word-en">${word.en}</span>
-        <span class="word-separator">—</span>
-        <span class="word-tr">${word.tr}</span>
-      `;
+
+      const isGrammar = word.category === 'grammar' || !!word.formula_short;
+      if (isGrammar) {
+        row.innerHTML = `
+          <button class="star-btn ${isStarred ? 'starred' : ''}"
+                  onclick="toggleStarInList(${word.id}, this)" title="Yıldızla">
+            ${isStarred ? '★' : '☆'}
+          </button>
+          <span class="word-en" style="font-family: monospace; color: #a78bfa; font-weight: 700;">${word.formula_short || word.en}</span>
+          <span class="word-separator">—</span>
+          <span class="word-tr"><strong>${word.topic_en || word.tr}</strong> ${word.topic_tr ? `(${word.topic_tr})` : ''}</span>
+        `;
+      } else {
+        row.innerHTML = `
+          <button class="star-btn ${isStarred ? 'starred' : ''}"
+                  onclick="toggleStarInList(${word.id}, this)" title="Yıldızla">
+            ${isStarred ? '★' : '☆'}
+          </button>
+          <span class="word-en">${word.en}</span>
+          <span class="word-separator">—</span>
+          <span class="word-tr">${word.tr}</span>
+        `;
+      }
       return row;
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
-      targetCategory = new URLSearchParams(window.location.search).get('type');
-      if (!typeConfig[targetCategory]) {
-        window.location.href = 'dashboard.html';
+      const params = new URLSearchParams(window.location.search);
+      const catSlug = params.get('category');
+      targetCategory = params.get('type');
+
+      loggedUser = typeof getCurrentUser === 'function' ? await getCurrentUser() : null;
+
+      // MODE 1: Direct Category Browsing (e.g. category.html?category=grammar)
+      if (catSlug && typeof DataManager !== 'undefined') {
+        const catObj = DataManager.getCategoryById(catSlug);
+        const items = DataManager.getItemsByCategory(catSlug);
+
+        document.getElementById('cat-icon').textContent = catObj ? catObj.icon : '📚';
+        document.getElementById('cat-text').textContent = catObj ? catObj.name : 'İçerik Listesi';
+        document.getElementById('cat-count').textContent = items.length;
+
+        // Fetch stars if user logged in
+        if (loggedUser && loggedUser.id) {
+          const sb = getSupabase();
+          const { data: studyWords } = await sb
+            .from('study_words').select('word_id, starred').eq('user_id', loggedUser.id);
+          if (studyWords) {
+            studyWords.forEach(sw => { if (sw.starred) starredWordIds.add(sw.word_id); });
+          }
+        }
+
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('cat-header').style.display = 'block';
+        document.getElementById('word-list-container').style.display = 'block';
+        const body = document.getElementById('word-body');
+
+        if (items.length === 0) {
+          body.innerHTML = `<div class="empty-state">Bu kategoride henüz içerik bulunmuyor.</div>`;
+        } else {
+          items.forEach(item => {
+            categoryWords.push(item.id);
+            body.appendChild(createWordRow(item, starredWordIds.has(item.id)));
+          });
+
+          const actionSection = document.getElementById('word-actions');
+          actionSection.style.display = 'flex';
+
+          if (catSlug === 'grammar') {
+            document.getElementById('quiz-en-tr').textContent = '⚡ Formül Quizi Başlat';
+            document.getElementById('quiz-en-tr').onclick = () => {
+              window.location.href = `quiz.html?category=grammar&mode=formula-topic`;
+            };
+            document.getElementById('quiz-tr-en').style.display = 'none';
+          } else {
+            document.getElementById('quiz-en-tr').onclick = () => {
+              localStorage.setItem('custom_quiz_ids', JSON.stringify(categoryWords));
+              window.location.href = `quiz.html?category=${catSlug}&mode=en-tr&custom=true`;
+            };
+            document.getElementById('quiz-tr-en').onclick = () => {
+              localStorage.setItem('custom_quiz_ids', JSON.stringify(categoryWords));
+              window.location.href = `quiz.html?category=${catSlug}&mode=tr-en&custom=true`;
+            };
+          }
+        }
         return;
       }
 
-      // Setup UI Headers
+      // MODE 2: Dashboard User Status Browsing (e.g. category.html?type=first_try)
+      if (!typeConfig[targetCategory]) {
+        window.location.href = 'index.html';
+        return;
+      }
+
       document.getElementById('cat-icon').textContent = typeConfig[targetCategory].icon;
       document.getElementById('cat-text').textContent = typeConfig[targetCategory].text;
-      document.getElementById('cat-count').className = `word-list-count`;
 
-      loggedUser = await getCurrentUser();
       if (!loggedUser || !loggedUser.id) {
         window.location.href = 'login.html';
         return;
       }
 
       const sb = getSupabase();
-
-      // Fetch Word Results
       const { data: wordResults } = await sb
         .from('word_results').select('word_id, result').eq('user_id', loggedUser.id).limit(50000);
         
-      // Fetch Starred Words
       const { data: studyWords } = await sb
         .from('study_words').select('word_id, starred').eq('user_id', loggedUser.id);
 
@@ -190,7 +269,6 @@
         });
       }
 
-      // Calculate Best Results
       const bestResults = {};
       if (wordResults && wordResults.length > 0) {
         wordResults.forEach(wr => {
@@ -201,14 +279,13 @@
         });
       }
 
-      // Filter for target category
       let targetIds = [];
       if (targetCategory === 'starred') {
         targetIds = Array.from(starredWordIds);
       } else {
         targetIds = Object.entries(bestResults)
           .filter(([_, r]) => r === targetCategory)
-          .map(([id, _]) => parseInt(id));
+          .map(([id, _]) => parseInt(id, 10));
       }
 
       document.getElementById('loading').style.display = 'none';
@@ -222,27 +299,25 @@
         body.innerHTML = `<div class="empty-state">Bu listede henüz kelime bulunmuyor.</div>`;
       } else {
         targetIds.forEach(wid => {
-          const word = ALL_WORDS_A2.find(w => w.id === wid);
-          if (word) {
-            categoryWords.push(word.id);
-            body.appendChild(createWordRow(word, starredWordIds.has(wid)));
+          const item = typeof DataManager !== 'undefined' ? DataManager.getItemById(wid) : null;
+          if (item) {
+            categoryWords.push(item.id);
+            body.appendChild(createWordRow(item, starredWordIds.has(wid)));
           }
         });
 
-        // Setup custom quiz logic if there are words
         const actionSection = document.getElementById('word-actions');
         actionSection.style.display = 'flex';
         
         document.getElementById('quiz-en-tr').onclick = () => {
           localStorage.setItem('custom_quiz_ids', JSON.stringify(categoryWords));
-          window.location.href = `quiz.html?level=a2&mode=en-tr&custom=true`;
+          window.location.href = `quiz.html?mode=en-tr&custom=true`;
         };
         document.getElementById('quiz-tr-en').onclick = () => {
           localStorage.setItem('custom_quiz_ids', JSON.stringify(categoryWords));
-          window.location.href = `quiz.html?level=a2&mode=tr-en&custom=true`;
+          window.location.href = `quiz.html?mode=tr-en&custom=true`;
         };
       }
-
     });
   </script>
 </body>

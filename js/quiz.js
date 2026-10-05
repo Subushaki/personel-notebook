@@ -114,54 +114,46 @@
   function init() {
     const params = new URLSearchParams(window.location.search);
     mode = params.get('mode') || 'en-tr';
-    const level = params.get('level') || 'a2';
-    const dataset = params.get('dataset') || 'kurs';
+    const level = params.get('level') || 'all';
+    const category = params.get('category') || params.get('dataset') || 'vocab';
     isCustomQuiz = params.get('custom') === 'true';
 
-    // Get word list
-    let wordList;
+    // Get item list
+    let wordList = [];
     const timesFilter = params.get('timesFilter');
 
-    let selectedData = WORDS_A2;
-    if (dataset === 'genel') selectedData = WORDS_A2_GENEL;
-    else if (dataset === 'grammar') selectedData = WORDS_A2_GRAMMAR;
-    else if (dataset === 'deyimler') selectedData = WORDS_A2_DEYIMLER;
-    else if (dataset === 'times') {
-      if (typeof WORDS_A2_TIMES_FULL !== 'undefined' && timesFilter) {
+    if (typeof DataManager !== 'undefined') {
+      if (category === 'times' && timesFilter && typeof WORDS_A2_TIMES_FULL !== 'undefined') {
         if (timesFilter === 'am') {
-          selectedData = WORDS_A2_TIMES_FULL.filter(w => parseInt(w.en.split(':')[0] || '0') < 12 && w.hintEn.includes('0') && w.en.includes('a.m.')); // We rely on hintEn "It is HH:MM"
-          // Better logic: use ID? IDs are generated starting from 2000 in order
-          // Or just string match on hintEn: '00:' to '11:'
-          selectedData = WORDS_A2_TIMES_FULL.filter(w => {
-            const match = w.hintEn.match(/It is (\d{2}):/);
-            if (match) {
-              const hour = parseInt(match[1], 10);
-              return hour < 12;
-            }
-            return false;
+          wordList = WORDS_A2_TIMES_FULL.filter(w => {
+            const match = w.hintEn ? w.hintEn.match(/It is (\d{2}):/) : null;
+            return match && parseInt(match[1], 10) < 12;
           });
         } else if (timesFilter === 'pm') {
-          selectedData = WORDS_A2_TIMES_FULL.filter(w => {
-            const match = w.hintEn.match(/It is (\d{2}):/);
-            if (match) {
-              const hour = parseInt(match[1], 10);
-              return hour >= 12;
-            }
-            return false;
+          wordList = WORDS_A2_TIMES_FULL.filter(w => {
+            const match = w.hintEn ? w.hintEn.match(/It is (\d{2}):/) : null;
+            return match && parseInt(match[1], 10) >= 12;
           });
         } else {
-          // Specific hour filter e.g. "00", "14"
-          selectedData = WORDS_A2_TIMES_FULL.filter(w => w.hintEn.includes(`It is ${timesFilter}:`));
+          wordList = WORDS_A2_TIMES_FULL.filter(w => w.hintEn && w.hintEn.includes(`It is ${timesFilter}:`));
         }
       } else {
-        selectedData = WORDS_A2_TIMES;
+        wordList = DataManager.getItemsByCategory(category);
       }
+    } else {
+      // Fallback
+      let selectedData = typeof WORDS_A2 !== 'undefined' ? WORDS_A2 : [];
+      if (category === 'genel' && typeof WORDS_A2_GENEL !== 'undefined') selectedData = WORDS_A2_GENEL;
+      else if (category === 'grammar' && typeof WORDS_A2_GRAMMAR !== 'undefined') selectedData = WORDS_A2_GRAMMAR;
+      else if (category === 'deyimler' && typeof WORDS_A2_DEYIMLER !== 'undefined') selectedData = WORDS_A2_DEYIMLER;
+      else if (category === 'times' && typeof WORDS_A2_TIMES !== 'undefined') selectedData = WORDS_A2_TIMES;
+      wordList = [...selectedData];
     }
 
     if (isCustomQuiz) {
-      // Custom quiz: read word IDs from localStorage
       const customIds = JSON.parse(localStorage.getItem('custom_quiz_ids') || '[]');
-      wordList = ALL_WORDS_A2.filter(w => customIds.includes(w.id));
+      const allItems = typeof DataManager !== 'undefined' ? DataManager.getAllItems() : (typeof ALL_WORDS_A2 !== 'undefined' ? ALL_WORDS_A2 : []);
+      wordList = allItems.filter(w => customIds.includes(w.id));
       if (wordList.length === 0) {
         alert('Özel quiz için kelime bulunamadı!');
         window.location.href = 'dashboard.html';
@@ -169,31 +161,52 @@
       }
       document.getElementById('progress-mode-label').textContent =
         (mode === 'en-tr' ? '🇬🇧→🇹🇷' : '🇹🇷→🇬🇧') + ' ⭐ Özel Quiz';
-    } else if (level === 'a2') {
-      wordList = [...selectedData];
+    } else {
       if (params.get('exclude') === 'true') {
         const excludeIds = JSON.parse(localStorage.getItem('exclude_quiz_ids') || '[]');
         wordList = wordList.filter(w => !excludeIds.includes(w.id));
         if (wordList.length === 0) {
-           alert('Çalışacak kelime kalmadı! Tüm kelimeleri biliyorsunuz.');
+           alert('Çalışacak içerik kalmadı! Tümünü başarıyla bildiniz.');
            window.location.href = 'dashboard.html';
            return;
         }
       }
-    } else {
-      alert('Bu seviye henüz eklenmedi!');
-      window.location.href = 'index.html';
-      return;
+    }
+
+    if (!wordList || wordList.length === 0) {
+      // Default to vocab if empty
+      wordList = typeof DataManager !== 'undefined' ? DataManager.getItemsByCategory('vocab') : [];
     }
 
     totalWords = wordList.length;
 
     // Set UI labels
-    if (dataset === 'grammar') {
-      if (!isCustomQuiz) document.getElementById('progress-mode-label').textContent = '📝 Grammar - Boşluk Doldurma';
-      document.getElementById('question-label').textContent = 'CÜMLE (Eksik Kısmı Bul)';
-      document.getElementById('answer-label').textContent = 'DOĞRU YAPI';
-      document.getElementById('answer-input').placeholder = 'Boşluğa gelmesi gereken kelimeyi yazın...';
+    if (category === 'grammar') {
+      mode = 'formula-topic';
+      if (!isCustomQuiz) document.getElementById('progress-mode-label').textContent = '⚡ Gramer Formülleri & Tense Quizi';
+      document.getElementById('question-label').textContent = 'FORMÜL & İPUCU (Konuyu Bul)';
+      document.getElementById('answer-label').textContent = 'GRAMER KONUSU / TENSE';
+      document.getElementById('answer-input').placeholder = 'Konuyu veya Tense adını yazın (örn: Present Perfect)...';
+    } else if (category === 'sentences') {
+      if (!isCustomQuiz) document.getElementById('progress-mode-label').textContent = mode === 'en-tr' ? '💬 Cümleler (İngilizce → Türkçe)' : '💬 Cümleler (Türkçe → İngilizce)';
+      document.getElementById('question-label').textContent = mode === 'en-tr' ? 'İNGİLİZCE CÜMLE' : 'TÜRKÇE CÜMLE';
+      document.getElementById('answer-label').textContent = mode === 'en-tr' ? 'TÜRKÇE KARŞILIĞI' : 'İNGİLİZCE KARŞILIĞI';
+      document.getElementById('answer-input').placeholder = mode === 'en-tr' ? 'Türkçe anlamını yazın...' : 'İngilizce karşılığını yazın...';
+    } else if (category === 'idioms') {
+      if (!isCustomQuiz) document.getElementById('progress-mode-label').textContent = mode === 'en-tr' ? '🎭 Deyimler (İngilizce → Türkçe)' : '🎭 Deyimler (Türkçe → İngilizce)';
+      document.getElementById('question-label').textContent = mode === 'en-tr' ? 'İNGİLİZCE DEYİM' : 'TÜRKÇE ANLAMI';
+      document.getElementById('answer-label').textContent = mode === 'en-tr' ? 'TÜRKÇE ANLAMI' : 'İNGİLİZCE DEYİM';
+      document.getElementById('answer-input').placeholder = mode === 'en-tr' ? 'Türkçe anlamını yazın...' : 'İngilizce deyimi yazın...';
+    } else if (category === 'phrasal_verbs') {
+      if (!isCustomQuiz) document.getElementById('progress-mode-label').textContent = mode === 'en-tr' ? '🔄 Phrasal Verbs (EN → TR)' : '🔄 Phrasal Verbs (TR → EN)';
+      document.getElementById('question-label').textContent = mode === 'en-tr' ? 'PHRASAL VERB' : 'TÜRKÇE ANLAMI';
+      document.getElementById('answer-label').textContent = mode === 'en-tr' ? 'TÜRKÇE ANLAMI' : 'PHRASAL VERB';
+      document.getElementById('answer-input').placeholder = mode === 'en-tr' ? 'Türkçe karşılığını yazın...' : 'İngilizce phrasal verb yazın...';
+    } else if (category === 'irregular_verbs') {
+      if (!isCustomQuiz) document.getElementById('progress-mode-label').textContent = '📊 Düzensiz Fiiller (V1 - V2 - V3)';
+      document.getElementById('question-label').textContent = 'DÜZENSİZ FİİL';
+      document.getElementById('answer-label').textContent = 'TÜRKÇE ANLAMI';
+      document.getElementById('answer-input').placeholder = 'Türkçe anlamını yazın...';
     } else if (mode === 'en-tr') {
       if (!isCustomQuiz) document.getElementById('progress-mode-label').textContent = '🇬🇧 İngilizce → Türkçe 🇹🇷';
       document.getElementById('question-label').textContent = 'İNGİLİZCE';
@@ -554,9 +567,34 @@
     }
 
     currentItem = queue.shift();
+    const w = currentItem.word;
+    const isGrammar = w.category === 'grammar' || !!w.formula_short || mode === 'formula-topic';
 
-    const questionWord = mode === 'en-tr' ? currentItem.word.en : currentItem.word.tr;
-    document.getElementById('question-word').textContent = questionWord;
+    const qEl = document.getElementById('question-word');
+
+    if (isGrammar) {
+      const exampleStr = w.forms && w.forms.positive ? w.forms.positive.example : (w.hintEn || '');
+      const signalsStr = w.signal_words ? w.signal_words.slice(0, 5).join(', ') : '';
+
+      qEl.innerHTML = `
+        <div class="grammar-formula-card">
+          <div class="grammar-badge">${escapeHtml(w.formula_short || w.en)}</div>
+          ${w.formula_long ? `<div class="grammar-formula-long">${escapeHtml(w.formula_long)}</div>` : ''}
+          ${exampleStr ? `
+            <div class="grammar-example-box">
+              <span class="grammar-example-title">💡 Örnek Cümle:</span>
+              <span class="grammar-example-text">"${escapeHtml(exampleStr)}"</span>
+            </div>
+          ` : ''}
+          ${signalsStr ? `
+            <div class="grammar-signals">🔑 <strong>İpuçları:</strong> ${escapeHtml(signalsStr)}</div>
+          ` : ''}
+        </div>
+      `;
+    } else {
+      const questionWord = mode === 'en-tr' ? w.en : w.tr;
+      qEl.textContent = questionWord;
+    }
 
     const input = document.getElementById('answer-input');
     input.value = '';
@@ -599,8 +637,18 @@
       return;
     }
 
-    const correctAnswer = mode === 'en-tr' ? currentItem.word.tr : currentItem.word.en;
-    const isCorrect = compareAnswers(userAnswer, correctAnswer);
+    const isGrammar = currentItem.word.category === 'grammar' || !!currentItem.word.formula_short || mode === 'formula-topic';
+    let isCorrect = false;
+    let correctAnswerDisplay = '';
+
+    if (isGrammar) {
+      isCorrect = compareGrammarAnswer(userAnswer, currentItem.word);
+      correctAnswerDisplay = (currentItem.word.topic_en || currentItem.word.tr) + (currentItem.word.topic_tr ? ` (${currentItem.word.topic_tr})` : '');
+    } else {
+      const correctAnswer = mode === 'en-tr' ? currentItem.word.tr : currentItem.word.en;
+      isCorrect = compareAnswers(userAnswer, correctAnswer);
+      correctAnswerDisplay = correctAnswer;
+    }
 
     const feedback = document.getElementById('feedback-message');
     const continueBtn = document.getElementById('continue-btn');
@@ -611,10 +659,17 @@
       document.getElementById('submit-btn').disabled = true;
 
       feedback.className = 'feedback-message correct';
-      feedback.innerHTML = `
-        ✅ Doğru!
-        <span class="correct-answer"><strong>${escapeHtml(currentItem.word.en)}</strong> — ${escapeHtml(currentItem.word.tr)}</span>
-      `;
+      if (isGrammar) {
+        feedback.innerHTML = `
+          ✅ Doğru!
+          <span class="correct-answer"><strong>${escapeHtml(currentItem.word.topic_en || currentItem.word.tr)}</strong> ${currentItem.word.topic_tr ? `(${escapeHtml(currentItem.word.topic_tr)})` : ''} — <span style="color:#a78bfa;">[${escapeHtml(currentItem.word.formula_short || currentItem.word.en)}]</span></span>
+        `;
+      } else {
+        feedback.innerHTML = `
+          ✅ Doğru!
+          <span class="correct-answer"><strong>${escapeHtml(currentItem.word.en)}</strong> — ${escapeHtml(currentItem.word.tr)}</span>
+        `;
+      }
 
       if (currentItem.attempt === 1) {
         stats.firstTry++;
@@ -655,7 +710,7 @@
       feedback.className = 'feedback-message wrong';
       feedback.innerHTML = `
         ❌ Yanlış!
-        <span class="correct-answer">Doğru cevap: <strong>${escapeHtml(correctAnswer)}</strong></span>
+        <span class="correct-answer">Doğru cevap: <strong>${escapeHtml(correctAnswerDisplay)}</strong></span>
       `;
 
       if (currentItem.attempt < 3) {
@@ -687,6 +742,57 @@
       isWaiting = true;
     }
   };
+
+  // ===== GRAMMAR SMART ANSWER COMPARISON =====
+  function compareGrammarAnswer(userAnswer, item) {
+    if (!userAnswer || !item) return false;
+
+    function cleanString(str) {
+      return (str || '').normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/İ/g, 'i').replace(/I/g, 'i').replace(/ı/g, 'i')
+        .replace(/Ğ/g, 'g').replace(/ğ/g, 'g')
+        .replace(/Ü/g, 'u').replace(/ü/g, 'u')
+        .replace(/Ş/g, 's').replace(/ş/g, 's')
+        .replace(/Ö/g, 'o').replace(/ö/g, 'o')
+        .replace(/Ç/g, 'c').replace(/ç/g, 'c')
+        .toLowerCase()
+        .replace(/[.,\-_/()]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function removeSuffixes(str) {
+      return str
+        .replace(/\b(tense|tensi|zaman|zamani|cumlesi|kipi|voice)\b/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    const userClean = cleanString(userAnswer);
+    const userCore = removeSuffixes(userClean);
+
+    // All valid accepted candidates
+    const candidates = [];
+    if (item.topic_en) candidates.push(item.topic_en);
+    if (item.topic_tr) candidates.push(item.topic_tr);
+    if (item.tr) candidates.push(item.tr);
+    if (item.accepted_answers && Array.isArray(item.accepted_answers)) {
+      candidates.push(...item.accepted_answers);
+    }
+
+    for (const cand of candidates) {
+      const candClean = cleanString(cand);
+      const candCore = removeSuffixes(candClean);
+
+      // Exact normalized match or core without suffix match
+      if (userClean === candClean || (userCore && userCore === candCore)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
 
   // ===== COMPARE ANSWERS =====
   function compareAnswers(userAnswer, correctAnswer) {

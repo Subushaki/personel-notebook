@@ -1,5 +1,5 @@
-const CACHE_NAME = 'personel-notebook-shell-v1';
-const DATA_CACHE_NAME = 'personel-notebook-data-v1';
+const CACHE_NAME = 'personel-notebook-shell-v2';
+const DATA_CACHE_NAME = 'personel-notebook-data-v2';
 
 const STATIC_ASSETS = [
   '/',
@@ -10,19 +10,16 @@ const STATIC_ASSETS = [
   '/profile.html',
   '/settings.html',
   '/study.html',
-  '/chat.html',
   '/inbox.html',
   '/o2.html',
   '/category.html',
   '/leaderboard.html',
   '/avatar-picker.html',
-  '/chat-apply.html',
   '/css/global.css',
   '/css/components.css',
   '/css/dashboard.css',
   '/css/theme-light.css',
   '/css/auth.css',
-  '/css/chat.css',
   '/css/inbox.css',
   '/css/leaderboard.css',
   '/css/o2.css',
@@ -34,8 +31,6 @@ const STATIC_ASSETS = [
   '/js/app.js',
   '/js/auth.js',
   '/js/avatars.js',
-  '/js/chat-apply.js',
-  '/js/chat.js',
   '/js/inbox.js',
   '/js/o2-engine.js',
   '/js/optimize.js',
@@ -48,10 +43,19 @@ const STATIC_ASSETS = [
   '/icons/icon.svg',
   // Supabase CDN Library
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
-  // Pre-cached vocab files for initial offline availability
+  // Pre-cached vocab & data files for initial offline availability
   '/js/words-a2.js',
   '/js/words-a2-saatler-full.js',
-  '/js/o2-data.js'
+  '/js/o2-data.js',
+  '/js/data/categories.js',
+  '/js/data/words.js',
+  '/js/data/grammar.js',
+  '/js/data/sentences.js',
+  '/js/data/idioms.js',
+  '/js/data/times.js',
+  '/js/data/phrasal-verbs.js',
+  '/js/data/irregular-verbs.js',
+  '/js/data/all-data.js'
 ];
 
 // Install Service Worker
@@ -103,8 +107,8 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Strategy 1: Network-First for vocabulary data files (dynamic A2/B1/B2 updates)
-  const isVocabFile = url.pathname.includes('/js/words-') || url.pathname.includes('/js/o2-data.js');
+  // Strategy 1: Network-First for vocabulary and data files (dynamic updates)
+  const isVocabFile = url.pathname.includes('/js/words-') || url.pathname.includes('/js/o2-data.js') || url.pathname.includes('/js/data/');
   
   if (isVocabFile) {
     event.respondWith(

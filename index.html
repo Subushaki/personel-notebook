@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Personel Notebook - İngilizce kelime pratik uygulaması. A2, B1, B2 seviyelerinde kelime bilmecesi çöz ve öğren.">
-  <title>Personel Notebook | Kelime Pratik</title>
+  <meta name="description" content="Personel Notebook - Birleşik İngilizce Öğrenme ve Pratik Platformu. Kelime, cümle, deyim, saatler ve gramer formülleriyle İngilizceni geliştir.">
+  <title>Personel Notebook | Birleşik İngilizce Pratik</title>
   <link rel="stylesheet" href="css/global.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/dashboard.css">
@@ -14,10 +14,86 @@
   <script src="js/optimize.js"></script>
 
   <style>
-    /* Hour Grid Symmetrical Layout (24 items divisible by 6, 4, 3) */
+    /* Category Grid Layout */
+    .category-main-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      width: 100%;
+      max-width: 800px;
+      margin-bottom: 30px;
+    }
+
+    .category-card {
+      position: relative;
+      background: var(--bg-card);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      padding: 24px 18px;
+      text-align: center;
+      cursor: pointer;
+      transition: all var(--transition-smooth);
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .category-card:hover {
+      border-color: var(--glass-border-hover);
+      transform: translateY(-4px);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    }
+
+    .category-card.active {
+      border-color: var(--accent-purple);
+      box-shadow: 0 0 20px rgba(139, 92, 246, 0.3), inset 0 0 15px rgba(139, 92, 246, 0.1);
+      background: rgba(139, 92, 246, 0.08);
+    }
+
+    .category-icon {
+      font-size: 2.2rem;
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    .category-card h3 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: var(--text-primary);
+    }
+
+    .category-card p {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      line-height: 1.3;
+    }
+
+    .category-badge-count {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-secondary);
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+
+    /* Gramer kartı vurgusu */
+    .category-card.featured-card {
+      border-color: rgba(139, 92, 246, 0.4);
+      background: linear-gradient(145deg, rgba(139, 92, 246, 0.05), rgba(59, 130, 246, 0.05));
+    }
+
+    /* Hour Grid Symmetrical Layout */
     #hour-grid {
       grid-template-columns: repeat(6, 1fr);
-      gap: 12px;
+      gap: 10px;
     }
     @media (max-width: 900px) {
       #hour-grid {
@@ -28,6 +104,14 @@
       #hour-grid {
         grid-template-columns: repeat(3, 1fr);
       }
+    }
+
+    .action-sub-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin-top: 20px;
+      flex-wrap: wrap;
     }
   </style>
 
@@ -54,72 +138,77 @@
   <div class="container">
 
     <!-- User Bar -->
-    <!-- User Bar -->
     <div class="user-bar" id="user-bar"></div>
 
     <!-- Branding -->
     <div class="brand">
       <span class="brand-icon">📚</span>
       <h1>Personel Notebook</h1>
-      <p>Kelime pratik yaparak İngilizceni geliştir</p>
+      <p>Birleşik İngilizce Öğrenme & Pratik Platformu</p>
     </div>
 
-    <!-- Level Selection -->
-    <div class="level-grid" id="level-grid">
-      <div class="level-card" id="level-a2" data-level="a2" onclick="selectLevel('a2')">
-        <div class="level-badge">A2</div>
-        <h3>Elementary</h3>
+    <!-- Category Selection Hub -->
+    <div class="category-main-grid" id="category-main-grid">
+      <!-- 1. Kelimeler -->
+      <div class="category-card" id="cat-vocab" onclick="selectCategory('vocab')">
+        <span class="category-icon">📖</span>
+        <h3>Kelimeler</h3>
+        <p>Kurs ve genel kelime hazinesi</p>
+        <span class="category-badge-count" id="count-vocab">864 Kelime</span>
       </div>
-      <div class="level-card disabled" id="level-b1" data-level="b1">
-        <div class="level-badge">B1</div>
-        <h3>Intermediate</h3>
-        <span class="coming-soon">Yakında Eklenecek</span>
+
+      <!-- 2. Gramer Formülleri -->
+      <div class="category-card featured-card" id="cat-grammar" onclick="selectCategory('grammar')">
+        <span class="category-icon">⚡</span>
+        <h3>Gramer Formülleri</h3>
+        <p>Formülü gör, doğru konuyu yaz</p>
+        <span class="category-badge-count" id="count-grammar" style="color: #a78bfa; background: rgba(139,92,246,0.15);">13 Temel Tense</span>
       </div>
-      <div class="level-card disabled" id="level-b2" data-level="b2">
-        <div class="level-badge">B2</div>
-        <h3>Upper-Intermediate</h3>
-        <span class="coming-soon">Yakında Eklenecek</span>
+
+      <!-- 3. Cümleler -->
+      <div class="category-card" id="cat-sentences" onclick="selectCategory('sentences')">
+        <span class="category-icon">💬</span>
+        <h3>Cümleler & Kalıplar</h3>
+        <p>Günlük diyaloglar & kalıp ifadeler</p>
+        <span class="category-badge-count" id="count-sentences">30 Kalıp Cümle</span>
+      </div>
+
+      <!-- 4. Deyimler -->
+      <div class="category-card" id="cat-idioms" onclick="selectCategory('idioms')">
+        <span class="category-icon">🎭</span>
+        <h3>Deyimler (Idioms)</h3>
+        <p>En sık kullanılan deyimler</p>
+        <span class="category-badge-count" id="count-idioms">40 Deyim</span>
+      </div>
+
+      <!-- 5. Saatler & Zaman -->
+      <div class="category-card" id="cat-times" onclick="selectCategory('times')">
+        <span class="category-icon">⏰</span>
+        <h3>Saatler & Zaman</h3>
+        <p>Analog/dijital saat okuma & zarflar</p>
+        <span class="category-badge-count" id="count-times">Zaman Terimleri</span>
+      </div>
+
+      <!-- 6. Phrasal Verbs -->
+      <div class="category-card" id="cat-phrasal_verbs" onclick="selectCategory('phrasal_verbs')">
+        <span class="category-icon">🔄</span>
+        <h3>Phrasal Verbs</h3>
+        <p>Deyimsel fiil & edat kalıpları</p>
+        <span class="category-badge-count" id="count-phrasal_verbs">30 Fiil</span>
+      </div>
+
+      <!-- 7. Düzensiz Fiiller -->
+      <div class="category-card" id="cat-irregular_verbs" onclick="selectCategory('irregular_verbs')">
+        <span class="category-icon">📊</span>
+        <h3>Düzensiz Fiiller</h3>
+        <p>V1 - V2 - V3 fiil çekimleri</p>
+        <span class="category-badge-count" id="count-irregular_verbs">30 Fiil</span>
       </div>
     </div>
 
-    <!-- Dataset Selection -->
-    <div class="mode-section" id="dataset-section" style="display: none;">
-      <h2 class="mode-title">Kelime Paketi Seç</h2>
-      <div class="mode-grid">
-        <a class="mode-card" id="dataset-kurs" href="#" onclick="selectDataset('kurs'); return false;">
-          <span class="mode-flags">📚</span>
-          <h3>A2 Kurs Kelimeleri</h3>
-          <p id="desc-kurs">410 Kelimelik ana liste</p>
-        </a>
-        <a class="mode-card" id="dataset-genel" href="#" onclick="selectDataset('genel'); return false;">
-          <span class="mode-flags">🌍</span>
-          <h3>A2 Genel Kelimeler</h3>
-          <p id="desc-genel">476 Kelimelik özel liste</p>
-        </a>
-        <a class="mode-card" id="dataset-grammar" href="#" onclick="selectDataset('grammar'); return false;">
-          <span class="mode-flags">📝</span>
-          <h3>A2 Grammar</h3>
-          <p id="desc-grammar">50 Soruluk Pronouns Testi</p>
-        </a>
-        <a class="mode-card" id="dataset-deyimler" href="#" onclick="selectDataset('deyimler'); return false;">
-          <span class="mode-flags">💬</span>
-          <h3>A2 Deyimler</h3>
-          <p>30 İngilizce Deyim</p>
-        </a>
-        <a class="mode-card" id="dataset-times" href="#" onclick="selectDataset('times'); return false;">
-          <span class="mode-flags">⏰</span>
-          <h3>A2 Zaman & Saatler</h3>
-          <p>34 Zaman Kalıbı</p>
-        </a>
-      </div>
-      <div style="margin-top: 24px; text-align: center;">
-        <a href="study.html" class="btn-secondary" style="width: 100%; max-width: 300px; justify-content: center;">📖 Flashcard Olarak Çalış</a>
-      </div>
-    </div>
-
-    <!-- Times Filter Selection -->
+    <!-- Times Filter Selection (Sadece Saatler Seçilince Görünür) -->
     <div class="mode-section" id="times-filter-section" style="display: none;">
-      <h2 class="mode-title">Saat Dilimi Seç (Kategori)</h2>
+      <h2 class="mode-title">Saat Dilimi Seçimi</h2>
       <div class="mode-grid">
         <a class="mode-card" href="#" onclick="selectTimesFilter('am'); return false;">
           <span class="mode-flags">🌅</span>
@@ -147,20 +236,40 @@
       </div>
     </div>
 
-    <!-- Mode Selection -->
+    <!-- Grammar Direct Action Section (Gramer Seçilince Görünür) -->
+    <div class="mode-section" id="grammar-action-section" style="display: none;">
+      <h2 class="mode-title">⚡ Gramer Formülleri Pratiği</h2>
+      <div class="mode-grid">
+        <a class="mode-card" href="#" onclick="startQuiz('formula-topic'); return false;" style="grid-column: span 2; border-color: var(--accent-purple); background: rgba(139, 92, 246, 0.08);">
+          <span class="mode-flags">📐 → ✍️</span>
+          <h3>Formül Quizi Başlat</h3>
+          <p>Kısa ve uzun formülü gör, doğru Tense / Gramer konusunu yaz!</p>
+        </a>
+      </div>
+      <div class="action-sub-buttons">
+        <a href="study.html?category=grammar" class="btn-secondary">📖 Flashcard Olarak Çalış</a>
+        <a href="category.html?category=grammar" class="btn-secondary">📋 Tüm Formül Listesini İncele</a>
+      </div>
+    </div>
+
+    <!-- Standard Mode Selection (Kelimeler, Cümleler, Deyimler vb.) -->
     <div class="mode-section" id="mode-section" style="display: none;">
-      <h2 class="mode-title">Pratik Modunu Seç</h2>
+      <h2 class="mode-title" id="mode-section-title">Pratik Modunu Seç</h2>
       <div class="mode-grid">
         <a class="mode-card" id="mode-en-tr" href="#" onclick="startQuiz('en-tr'); return false;">
           <span class="mode-flags">🇬🇧 <span class="mode-arrow">→</span> 🇹🇷</span>
           <h3>İngilizce → Türkçe</h3>
-          <p>İngilizce kelimeyi gör, Türkçe anlamını yaz</p>
+          <p>İfadeyi gör, Türkçe anlamını yaz</p>
         </a>
         <a class="mode-card" id="mode-tr-en" href="#" onclick="startQuiz('tr-en'); return false;">
           <span class="mode-flags">🇹🇷 <span class="mode-arrow">→</span> 🇬🇧</span>
           <h3>Türkçe → İngilizce</h3>
-          <p>Türkçe kelimeyi gör, İngilizce karşılığını yaz</p>
+          <p>Türkçe anlamı gör, İngilizce karşılığını yaz</p>
         </a>
+      </div>
+      <div class="action-sub-buttons">
+        <a href="#" id="btn-study-link" class="btn-secondary">📖 Flashcard Olarak Çalış</a>
+        <a href="#" id="btn-list-link" class="btn-secondary">📋 Kelime / İçerik Listesi</a>
       </div>
     </div>
 
@@ -168,6 +277,15 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase-config.js"></script>
+  <script src="js/data/categories.js"></script>
+  <script src="js/data/words.js"></script>
+  <script src="js/data/grammar.js"></script>
+  <script src="js/data/sentences.js"></script>
+  <script src="js/data/idioms.js"></script>
+  <script src="js/data/times.js"></script>
+  <script src="js/data/phrasal-verbs.js"></script>
+  <script src="js/data/irregular-verbs.js"></script>
+  <script src="js/data/all-data.js"></script>
   <script src="js/words-a2-saatler-full.js"></script>
   <script src="js/words-a2.js"></script>
   <script src="js/auth.js"></script>
